@@ -22,6 +22,9 @@ You can use these from a manifest by writing the resource names you want under t
 ```
 Make sure to schedule the pod to a node that actually has these devices, since this plugin does not check.
 
+### Mounts
+Make sure that `/var/lib/kubelet/device-plugins` is visible in the pod. See daemon-set-example.yaml.
+
 ## Based On
 
 https://oneuptime.com/blog/post/2026-02-09-device-plugin-custom-hardware-kubernetes/view
