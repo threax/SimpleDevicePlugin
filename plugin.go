@@ -13,8 +13,8 @@ import (
 )
 
 const (
-    resourceName = "example.com/fpga"
     socketPath   = "/var/lib/kubelet/device-plugins/"
+	resourceBaseName = "threax.com/devices/"
 )
 
 type FPGAPlugin struct {
@@ -23,28 +23,27 @@ type FPGAPlugin struct {
     devices    []*pluginapi.Device
     server     *grpc.Server
     health     chan *pluginapi.Device
+	devicePaths []string
+	resourceName string
 }
 
-func NewFPGAPlugin() *FPGAPlugin {
+func NewFPGAPlugin(name string, devicePaths []string) *FPGAPlugin {
     return &FPGAPlugin{
-        socket:  path.Join(socketPath, "fpga.sock"),
-        devices: discoverFPGAs(),
+        socket:  path.Join(socketPath, name + "devices.sock"),
+        devices: makeDevices(name),
         health:  make(chan *pluginapi.Device),
+		resourceName: resourceBaseName + name,
+		devicePaths: devicePaths,
     }
 }
 
-func discoverFPGAs() []*pluginapi.Device {
-    // Discover FPGA devices on the system
-    // This is where you'd scan /dev or use vendor APIs
+func makeDevices(name string) []*pluginapi.Device {
     devices := []*pluginapi.Device{}
 
-    // Example: discover 2 FPGAs
-    for i := 0; i < 2; i++ {
-        devices = append(devices, &pluginapi.Device{
-            ID:     fmt.Sprintf("fpga-%d", i),
-            Health: pluginapi.Healthy,
-        })
-    }
+	devices = append(devices, &pluginapi.Device{
+		ID:     name,
+		Health: pluginapi.Healthy,
+	})
 
     return devices
 }
@@ -75,6 +74,7 @@ func (p *FPGAPlugin) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.Devic
             if err := stream.Send(&pluginapi.ListAndWatchResponse{Devices: p.devices}); err != nil {
                 return err
             }
+			<-time.After(600 * time.Second)
         }
     }
 }
@@ -83,12 +83,11 @@ func (p *FPGAPlugin) Allocate(ctx context.Context, req *pluginapi.AllocateReques
     responses := &pluginapi.AllocateResponse{}
 
     for _, containerReq := range req.ContainerRequests {
+		print(containerReq)
+
         containerResp := &pluginapi.ContainerAllocateResponse{}
 
-        for _, deviceID := range containerReq.DevicesIds {
-            // Map device ID to device path
-            devicePath := fmt.Sprintf("/dev/fpga%s", deviceID[len("fpga-"):])
-
+        for _, devicePath := range p.devicePaths {
             // Add device to container
             containerResp.Devices = append(containerResp.Devices, &pluginapi.DeviceSpec{
                 HostPath:      devicePath,
@@ -97,9 +96,9 @@ func (p *FPGAPlugin) Allocate(ctx context.Context, req *pluginapi.AllocateReques
             })
 
             // Add environment variables
-            containerResp.Envs = map[string]string{
-                "FPGA_DEVICE": deviceID,
-            }
+            // containerResp.Envs = map[string]string{
+            //     "FPGA_DEVICE": deviceID,
+            // }
         }
 
         responses.ContainerResponses = append(responses.ContainerResponses, containerResp)
@@ -133,7 +132,7 @@ func (p *FPGAPlugin) Register() error {
     request := &pluginapi.RegisterRequest{
         Version:      pluginapi.Version,
         Endpoint:     path.Base(p.socket),
-        ResourceName: resourceName,
+        ResourceName: p.resourceName,
     }
 
     _, err = client.Register(context.Background(), request)
@@ -141,6 +140,8 @@ func (p *FPGAPlugin) Register() error {
 }
 
 func (p *FPGAPlugin) Serve() error {
+	fmt.Println("Starting Server")
+
     // Remove old socket if exists
     os.Remove(p.socket)
 
@@ -170,7 +171,7 @@ func (p *FPGAPlugin) Stop() {
 }
 
 func main() {
-    plugin := NewFPGAPlugin()
+    plugin := NewFPGAPlugin("fpga", []string{"/dev/dri/renderD128", "/dev/dri/card1"})
 
     if err := plugin.Serve(); err != nil {
         fmt.Fprintf(os.Stderr, "Failed to start plugin: %v\n", err)
