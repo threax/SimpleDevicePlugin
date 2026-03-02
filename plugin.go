@@ -14,7 +14,7 @@ import (
 
 const (
     socketPath   = "/var/lib/kubelet/device-plugins/"
-	resourceBaseName = "threax.com/devices/"
+	resourceBaseName = "threax.com/"
 )
 
 type FPGAPlugin struct {
