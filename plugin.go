@@ -15,7 +15,7 @@ import (
 
 const (
     socketPath   = "/var/lib/kubelet/device-plugins/"
-	resourceBaseName = "threax.com/"
+	resourceBaseName = "devices.threax.com/"
 )
 
 type DeviceResourcePlugin struct {
