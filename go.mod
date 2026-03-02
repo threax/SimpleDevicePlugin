@@ -1,4 +1,4 @@
-module example.com/fpga-plugin
+module threax.com/sdp-plugin
 
 go 1.25.0
 

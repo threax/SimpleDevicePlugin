@@ -1,3 +1,4 @@
 Dockerfile
-fpga-plugin
+sdp-plugin
 test
+Readme.md

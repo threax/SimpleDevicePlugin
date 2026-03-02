@@ -4,5 +4,5 @@ COPY . .
 RUN go build
 
 FROM debian
-COPY --from=build /go/fpga-plugin fpga-plugin
-ENTRYPOINT ["/fpga-plugin"]
+COPY --from=build /go/sdp-plugin sdp-plugin
+ENTRYPOINT ["/sdp-plugin"]

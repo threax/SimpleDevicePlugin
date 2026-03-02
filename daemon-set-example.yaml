@@ -1,32 +1,27 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: fpga-device-plugin
+  name: simple-device-plugin
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      name: fpga-device-plugin
+      name: simple-device-plugin
   template:
     metadata:
       labels:
-        name: fpga-device-plugin
+        name: simple-device-plugin
     spec:
       hostNetwork: true
       containers:
-      - name: fpga-plugin
-        image: example.com/fpga-device-plugin:latest
+      - name: simple-device-plugin
+        image: example.com/simple-device-plugin:latest
         securityContext:
           privileged: true
         volumeMounts:
         - name: device-plugin
           mountPath: /var/lib/kubelet/device-plugins
-        - name: dev
-          mountPath: /dev
       volumes:
       - name: device-plugin
         hostPath:
           path: /var/lib/kubelet/device-plugins
-      - name: dev
-        hostPath:
-          path: /dev
