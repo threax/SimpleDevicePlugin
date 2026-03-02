@@ -7,6 +7,7 @@ import (
     "os"
     "path"
     "time"
+	"encoding/json"
 
     "google.golang.org/grpc"
     pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -30,14 +31,14 @@ type DeviceResourcePlugin struct {
 func NewDeviceResourcePlugin(name string, devicePaths []string) *DeviceResourcePlugin {
     return &DeviceResourcePlugin{
         socket:  path.Join(socketPath, name + "devices.sock"),
-        devices: makeDevices(name),
+        devices: makek8sDevice(name),
         health:  make(chan *pluginapi.Device),
 		resourceName: resourceBaseName + name,
 		devicePaths: devicePaths,
     }
 }
 
-func makeDevices(name string) []*pluginapi.Device {
+func makek8sDevice(name string) []*pluginapi.Device {
     devices := []*pluginapi.Device{}
 
 	devices = append(devices, &pluginapi.Device{
@@ -163,15 +164,35 @@ func (p *DeviceResourcePlugin) Stop() {
     os.Remove(p.socket)
 }
 
+type ConfigItem struct {
+	Name string
+	Paths []string
+}
+
 func main() {
 	fmt.Println("Starting Server...")
 
-    plugin := NewDeviceResourcePlugin("gpu", []string{"/dev/dri/renderD128", "/dev/dri/card1"})
+	for _, arg := range os.Args[1:] {
+		var argData ConfigItem
+		err := json.Unmarshal([]byte(arg), &argData)
+		if err != nil {
+			fmt.Println(arg);
+			fmt.Println(err)
+			os.Exit(1)
+		}
 
-    if err := plugin.Serve(); err != nil {
-        fmt.Fprintf(os.Stderr, "Failed to start plugin: %v\n", err)
-        os.Exit(1)
-    }
+		plugin := NewDeviceResourcePlugin(argData.Name, argData.Paths)
+
+		fmt.Println("Setting up k8s device resource plugin for " + plugin.resourceName);
+		for _, path := range plugin.devicePaths {
+			fmt.Println("     device path " + path);
+		}
+
+		if err := plugin.Serve(); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to start plugin: %v\n", err)
+			os.Exit(1)
+		}
+	}
 
     fmt.Println("Simple Device Plugin started...")
 
