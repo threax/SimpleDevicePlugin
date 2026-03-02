@@ -17,7 +17,7 @@ const (
 	resourceBaseName = "threax.com/"
 )
 
-type FPGAPlugin struct {
+type DeviceResourcePlugin struct {
 	pluginapi.UnimplementedDevicePluginServer
     socket     string
     devices    []*pluginapi.Device
@@ -27,8 +27,8 @@ type FPGAPlugin struct {
 	resourceName string
 }
 
-func NewFPGAPlugin(name string, devicePaths []string) *FPGAPlugin {
-    return &FPGAPlugin{
+func NewDeviceResourcePlugin(name string, devicePaths []string) *DeviceResourcePlugin {
+    return &DeviceResourcePlugin{
         socket:  path.Join(socketPath, name + "devices.sock"),
         devices: makeDevices(name),
         health:  make(chan *pluginapi.Device),
@@ -48,13 +48,13 @@ func makeDevices(name string) []*pluginapi.Device {
     return devices
 }
 
-func (p *FPGAPlugin) GetDevicePluginOptions(ctx context.Context, empty *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+func (p *DeviceResourcePlugin) GetDevicePluginOptions(ctx context.Context, empty *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
     return &pluginapi.DevicePluginOptions{
         PreStartRequired: false,
     }, nil
 }
 
-func (p *FPGAPlugin) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+func (p *DeviceResourcePlugin) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
     // Send initial device list
     if err := stream.Send(&pluginapi.ListAndWatchResponse{Devices: p.devices}); err != nil {
         return err
@@ -79,7 +79,7 @@ func (p *FPGAPlugin) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.Devic
     }
 }
 
-func (p *FPGAPlugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+func (p *DeviceResourcePlugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
     responses := &pluginapi.AllocateResponse{}
 
     for _, containerReq := range req.ContainerRequests {
@@ -94,11 +94,6 @@ func (p *FPGAPlugin) Allocate(ctx context.Context, req *pluginapi.AllocateReques
                 ContainerPath: devicePath,
                 Permissions:   "rw",
             })
-
-            // Add environment variables
-            // containerResp.Envs = map[string]string{
-            //     "FPGA_DEVICE": deviceID,
-            // }
         }
 
         responses.ContainerResponses = append(responses.ContainerResponses, containerResp)
@@ -107,15 +102,15 @@ func (p *FPGAPlugin) Allocate(ctx context.Context, req *pluginapi.AllocateReques
     return responses, nil
 }
 
-func (p *FPGAPlugin) PreStartContainer(ctx context.Context, req *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
+func (p *DeviceResourcePlugin) PreStartContainer(ctx context.Context, req *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
     return &pluginapi.PreStartContainerResponse{}, nil
 }
 
-func (p *FPGAPlugin) GetPreferredAllocation(ctx context.Context, req *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
+func (p *DeviceResourcePlugin) GetPreferredAllocation(ctx context.Context, req *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
     return &pluginapi.PreferredAllocationResponse{}, nil
 }
 
-func (p *FPGAPlugin) Register() error {
+func (p *DeviceResourcePlugin) Register() error {
     conn, err := grpc.Dial(
         pluginapi.KubeletSocket,
         grpc.WithInsecure(),
@@ -139,9 +134,7 @@ func (p *FPGAPlugin) Register() error {
     return err
 }
 
-func (p *FPGAPlugin) Serve() error {
-	fmt.Println("Starting Server")
-
+func (p *DeviceResourcePlugin) Serve() error {
     // Remove old socket if exists
     os.Remove(p.socket)
 
@@ -163,7 +156,7 @@ func (p *FPGAPlugin) Serve() error {
     return p.Register()
 }
 
-func (p *FPGAPlugin) Stop() {
+func (p *DeviceResourcePlugin) Stop() {
     if p.server != nil {
         p.server.Stop()
     }
@@ -171,14 +164,16 @@ func (p *FPGAPlugin) Stop() {
 }
 
 func main() {
-    plugin := NewFPGAPlugin("fpga", []string{"/dev/dri/renderD128", "/dev/dri/card1"})
+	fmt.Println("Starting Server...")
+
+    plugin := NewDeviceResourcePlugin("gpu", []string{"/dev/dri/renderD128", "/dev/dri/card1"})
 
     if err := plugin.Serve(); err != nil {
         fmt.Fprintf(os.Stderr, "Failed to start plugin: %v\n", err)
         os.Exit(1)
     }
 
-    fmt.Println("FPGA device plugin started")
+    fmt.Println("Simple Device Plugin started...")
 
     // Block forever
     select {}
